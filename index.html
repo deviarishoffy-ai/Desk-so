@@ -3,64 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Audit LPLPO & Stok Opname</title>
-    <!-- Tailwind CSS untuk tampilan antarmuka -->
+    <title>DESK STOK OPNAME</title>
+    <!-- Tailwind CSS untuk Desain UI Modern -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS untuk membaca dan memproses Excel murni lewat browser -->
+    <!-- SheetJS untuk memproses Excel langsung dari Browser -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
+<body class="bg-slate-100 font-sans min-h-screen p-4 md:p-8 text-gray-800">
 
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-100">
+    <div class="max-w-6xl mx-auto space-y-6">
         
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-extrabold text-gray-800">Audit Selisih SO</h2>
-            <p class="text-sm text-gray-500 mt-2">Bandingkan selisih LPLPO dengan hitungan (Fisik - LPLPO) dari file Stok Opname.</p>
+        <!-- Bagian Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-center">
+            <h1 class="text-3xl font-black text-indigo-700 uppercase tracking-widest">Desk Stok Opname</h1>
+            <p class="text-gray-500 mt-2 text-sm">Review dan sinkronisasi selisih fisik LPLPO secara otomatis</p>
         </div>
 
-        <form id="auditForm" class="space-y-4">
+        <!-- Bagian Form Upload -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <form id="auditForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- File 1 (LPLPO) -->
+                <div class="space-y-2 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <label class="block text-sm font-bold text-indigo-900">1. File LPLPO (Master)</label>
+                    <p class="text-xs text-indigo-600 mb-2">Target Sheet: <b>LPLPO</b> <br><i>(Mengambil kolom selisih paling akhir)</i></p>
+                    <input type="file" id="file_lplpo" accept=".xlsx" required
+                        class="block w-full text-sm text-gray-700 bg-white border border-indigo-200 rounded-lg p-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-indigo-50/50 transition">
+                </div>
+
+                <!-- File 2 (Stok Opname) -->
+                <div class="space-y-2 bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <label class="block text-sm font-bold text-purple-900">2. File Stok Opname</label>
+                    <p class="text-xs text-purple-600 mb-2">Target Sheet: <b>LPLPO RI</b> <br><i>(Menghitung kolom Fisik dikurangi LPLPO)</i></p>
+                    <input type="file" id="file_so" accept=".xlsx" required
+                        class="block w-full text-sm text-gray-700 bg-white border border-purple-200 rounded-lg p-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-purple-50/50 transition">
+                </div>
+
+                <!-- Tombol Submit -->
+                <div class="md:col-span-2 flex flex-col items-center mt-2">
+                    <button type="submit" id="btnSubmit"
+                        class="w-full md:w-1/2 bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 transition-all shadow-md flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        Proses & Tampilkan Preview
+                    </button>
+                    <!-- Pesan Error -->
+                    <p id="statusMsg" class="mt-4 text-sm font-semibold hidden w-full md:w-1/2 text-center"></p>
+                </div>
+            </form>
+        </div>
+
+        <!-- Bagian Preview Data Tabel -->
+        <div id="previewSection" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <!-- Header Tabel -->
+            <div class="p-5 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center bg-gray-50 gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800">Preview Hasil Perbandingan</h2>
+                    <p class="text-sm text-gray-500 mt-1" id="summaryText">Total Data: 0 | SAMA: 0 | BEDA: 0</p>
+                </div>
+                <button id="btnDownload" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Unduh File Excel
+                </button>
+            </div>
             
-            <!-- Upload File 1 -->
-            <div class="space-y-1">
-                <label class="block text-sm font-semibold text-gray-700">1. File LPLPO</label>
-                <p class="text-xs text-gray-400">Sheet: LPLPO (Mengambil selisih kolom terakhir)</p>
-                <input type="file" id="file_lplpo" accept=".xlsx" required
-                    class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-200 rounded-lg p-1.5 cursor-pointer">
+            <!-- Kontainer Tabel yang bisa di-scroll -->
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table class="min-w-full text-sm text-left whitespace-nowrap">
+                    <thead class="text-xs text-gray-600 uppercase bg-white sticky top-0 shadow-sm z-10 outline outline-1 outline-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 font-bold">Kode Obat</th>
+                            <th class="px-4 py-3 font-bold">Nama Obat</th>
+                            <th class="px-4 py-3 text-center font-bold bg-indigo-50 text-indigo-800">Selisih<br><span class="text-[10px] font-normal tracking-normal">(LPLPO File 1)</span></th>
+                            <th class="px-4 py-3 text-center font-bold bg-purple-50 text-purple-800">Fisik<br><span class="text-[10px] font-normal tracking-normal">(File 2 LPLPO RI)</span></th>
+                            <th class="px-4 py-3 text-center font-bold bg-purple-50 text-purple-800">LPLPO<br><span class="text-[10px] font-normal tracking-normal">(File 2 LPLPO RI)</span></th>
+                            <th class="px-4 py-3 text-center font-bold bg-purple-100 text-purple-900">Hitung<br><span class="text-[10px] font-normal tracking-normal">(Fisik - LPLPO)</span></th>
+                            <th class="px-4 py-3 text-center font-bold">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200 bg-white">
+                        <!-- Baris Data Masuk Kesini via JavaScript -->
+                    </tbody>
+                </table>
             </div>
+        </div>
 
-            <!-- Upload File 2 -->
-            <div class="space-y-1 mt-4">
-                <label class="block text-sm font-semibold text-gray-700">2. File Stok Opname</label>
-                <p class="text-xs text-gray-400">Sheet: worksheet (Menghitung Fisik - LPLPO)</p>
-                <input type="file" id="file_so" accept=".xlsx" required
-                    class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-gray-200 rounded-lg p-1.5 cursor-pointer">
-            </div>
-
-            <button type="submit" id="btnSubmit"
-                class="w-full mt-6 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition duration-200 flex justify-center items-center">
-                Proses & Unduh Hasil
-            </button>
-
-            <!-- Pesan Status -->
-            <p id="statusMsg" class="text-sm font-semibold text-center mt-3 hidden"></p>
-        </form>
     </div>
 
     <script>
+        // Variabel global untuk menyimpan data agar siap diunduh ke Excel
+        let globalExcelData = [];
+
         document.getElementById('auditForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const btn = document.getElementById('btnSubmit');
             const statusMsg = document.getElementById('statusMsg');
+            const previewSection = document.getElementById('previewSection');
+            const tableBody = document.getElementById('tableBody');
+            
             const fileLplpo = document.getElementById('file_lplpo').files[0];
             const fileSo = document.getElementById('file_so').files[0];
 
+            // Set state tampilan memproses UI
             btn.disabled = true;
-            btn.innerHTML = "Memproses...";
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Membaca & Memproses File...`;
             statusMsg.classList.add('hidden');
+            previewSection.classList.add('hidden');
+            tableBody.innerHTML = '';
+            globalExcelData = [];
 
             try {
-                // Fungsi pembantu untuk membaca file sebagai ArrayBuffer
+                // Fungsi baca file binary
                 const readFile = (file) => new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = (e) => resolve(new Uint8Array(e.target.result));
@@ -68,83 +120,137 @@
                     reader.readAsArrayBuffer(file);
                 });
 
-                // 1. Baca kedua file
                 const data1 = await readFile(fileLplpo);
                 const data2 = await readFile(fileSo);
                 const wb1 = XLSX.read(data1, {type: 'array'});
                 const wb2 = XLSX.read(data2, {type: 'array'});
 
-                // 2. Akses Sheet LPLPO (File 1)
+                // ----------------------------------------------------
+                // 1. Ekstrak File 1 (LPLPO)
+                // ----------------------------------------------------
                 const sheet1 = wb1.Sheets['LPLPO'];
-                if(!sheet1) throw new Error("Sheet 'LPLPO' tidak ditemukan di file pertama.");
+                if(!sheet1) throw new Error("Sheet bernama 'LPLPO' tidak ditemukan di file pertama.");
                 const rows1 = XLSX.utils.sheet_to_json(sheet1, {header: 1, defval: null});
 
-                // 3. Akses Sheet Worksheet (File 2)
-                const sheet2Name = wb2.SheetNames.find(s => s.toLowerCase() === 'worksheet');
-                if(!sheet2Name) throw new Error("Sheet 'worksheet' tidak ditemukan di file kedua.");
-                const sheet2 = wb2.Sheets[sheet2Name];
-                const rows2 = XLSX.utils.sheet_to_json(sheet2, {header: 1, defval: null});
-
-                // 4. Ekstrak Data File 1 (Dimulai baris ke-14 / index 13)
-                // Kolom: 1(Kode), 2(Nama), 32(Selisih Terakhir)
                 let lplpoMap = {};
                 for(let i = 13; i < rows1.length; i++) {
                     const row = rows1[i];
                     if(!row || !row[1]) continue; 
                     const kode = row[1];
                     const nama = row[2];
-                    const selisih = parseFloat(row[32]) || 0;
+                    const selisih = parseFloat(row[32]) || 0; // Kolom ke-33
                     lplpoMap[kode] = { nama, selisih };
                 }
 
-                // 5. Ekstrak Data File 2 (Dimulai baris ke-5 / index 4) dan Gabungkan
-                // Kolom: 2(Kode), 9(Fisik), 13(LPLPO)
-                let resultData = [];
-                for(let i = 4; i < rows2.length; i++) {
-                    const row = rows2[i];
-                    if(!row || !row[2]) continue; 
-                    const kode = row[2];
-                    
-                    if(lplpoMap[kode]) {
-                        const fisik = parseFloat(row[9]) || 0;
-                        const lplpo_so = parseFloat(row[13]) || 0;
-                        const hitung = fisik - lplpo_so;
-                        
-                        // Perbandingan
-                        const status = (lplpoMap[kode].selisih === hitung) ? 'SAMA' : 'BEDA';
+                // ----------------------------------------------------
+                // 2. Ekstrak File 2 (LPLPO RI)
+                // ----------------------------------------------------
+                const sheet2Name = wb2.SheetNames.find(s => s.toLowerCase() === 'lplpo ri');
+                if(!sheet2Name) throw new Error("Sheet bernama 'LPLPO RI' tidak ditemukan di file Stok Opname.");
+                const sheet2 = wb2.Sheets[sheet2Name];
+                const rows2 = XLSX.utils.sheet_to_json(sheet2, {header: 1, defval: null});
 
-                        resultData.push({
-                            'Kode Obat': kode,
-                            'Nama Obat': lplpoMap[kode].nama,
-                            'Selisih (File LPLPO)': lplpoMap[kode].selisih,
-                            'Fisik (Worksheet)': fisik,
-                            'LPLPO (Worksheet)': lplpo_so,
-                            'Hasil Hitung (Fisik - LPLPO)': hitung,
-                            'Status Perbandingan': status
-                        });
+                let headerRowIdx = -1;
+                let colKode = -1, colFisik = -1, colLplpo = -1;
+
+                // Mendeteksi indeks kolom secara dinamis (Fisik, LPLPO, Kode)
+                for(let i = 0; i < 15; i++) {
+                    if(rows2[i]) {
+                        for(let j = 0; j < rows2[i].length; j++) {
+                            let val = (rows2[i][j] || '').toString().toLowerCase().trim();
+                            if(val === 'kode' || val === 'kode barang') colKode = j;
+                            if(val === 'fisik' || val === 'stok so' || val === 'stok fisik') colFisik = j;
+                            if(val === 'lplpo') colLplpo = j;
+                        }
+                        if(colKode !== -1 && colLplpo !== -1) {
+                            headerRowIdx = i;
+                            break;
+                        }
                     }
                 }
 
-                if(resultData.length === 0) throw new Error("Kode obat tidak ada yang cocok untuk disandingkan.");
+                if(headerRowIdx === -1) throw new Error("Gagal mendeteksi header pada sheet LPLPO RI. Pastikan terdapat kolom 'Kode' dan 'LPLPO'.");
+                if(colFisik === -1) throw new Error("Kolom 'Fisik' atau 'Stok SO' tidak ditemukan pada sheet LPLPO RI file kedua. Pastikan Anda telah menamai kolom tersebut dengan 'Fisik'.");
 
-                // 6. Ekspor Hasil ke Excel
-                const ws = XLSX.utils.json_to_sheet(resultData);
-                const wbResult = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wbResult, ws, "Hasil Audit");
-                XLSX.writeFile(wbResult, "Hasil_Audit_Selisih.xlsx");
+                let totalSama = 0;
+                let totalBeda = 0;
 
-                // Tampilkan pesan sukses
-                statusMsg.textContent = "Berhasil! File Excel telah diunduh.";
-                statusMsg.className = "text-sm font-semibold text-center mt-3 text-green-600 block";
+                // ----------------------------------------------------
+                // 3. Gabungkan dan Render Data
+                // ----------------------------------------------------
+                for(let i = headerRowIdx + 1; i < rows2.length; i++) {
+                    const row = rows2[i];
+                    if(!row || !row[colKode]) continue; 
+                    const kode = row[colKode];
+                    
+                    if(lplpoMap[kode]) {
+                        const fisik = parseFloat(row[colFisik]) || 0;
+                        const lplpo_so = parseFloat(row[colLplpo]) || 0;
+                        const hitung = fisik - lplpo_so; // Rumus Fisik - LPLPO
+                        
+                        const status = (lplpoMap[kode].selisih === hitung) ? 'SAMA' : 'BEDA';
+                        
+                        if(status === 'SAMA') totalSama++; else totalBeda++;
+
+                        globalExcelData.push({
+                            'Kode Obat': kode,
+                            'Nama Obat': lplpoMap[kode].nama,
+                            'Selisih (LPLPO File 1)': lplpoMap[kode].selisih,
+                            'Fisik (LPLPO RI File 2)': fisik,
+                            'LPLPO (LPLPO RI File 2)': lplpo_so,
+                            'Hasil Hitung (Fisik - LPLPO)': hitung,
+                            'Status Perbandingan': status
+                        });
+
+                        const tr = document.createElement('tr');
+                        // Logika CSS Sorot Merah Jika Baris Beda
+                        if(status === 'BEDA') {
+                            tr.className = 'bg-red-50 hover:bg-red-100 transition-colors duration-150';
+                        } else {
+                            tr.className = 'hover:bg-gray-50 transition-colors duration-150';
+                        }
+
+                        tr.innerHTML = `
+                            <td class="px-4 py-2 font-medium text-gray-900 border-r border-gray-100">${kode}</td>
+                            <td class="px-4 py-2 text-gray-700 max-w-xs truncate" title="${lplpoMap[kode].nama}">${lplpoMap[kode].nama}</td>
+                            <td class="px-4 py-2 text-center font-bold bg-indigo-50/50">${lplpoMap[kode].selisih}</td>
+                            <td class="px-4 py-2 text-center text-gray-700 bg-purple-50/20">${fisik}</td>
+                            <td class="px-4 py-2 text-center text-gray-700 bg-purple-50/20">${lplpo_so}</td>
+                            <td class="px-4 py-2 text-center font-bold ${status==='BEDA' ? 'text-red-700' : 'text-purple-700'} bg-purple-50/50">${hitung}</td>
+                            <td class="px-4 py-2 text-center">
+                                <span class="px-2.5 py-1 rounded-md text-[11px] font-black tracking-wide ${status === 'SAMA' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}">
+                                    ${status}
+                                </span>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    }
+                }
+
+                if(globalExcelData.length === 0) throw new Error("Tidak ada kode obat yang cocok antara file master dan file Stok Opname.");
+
+                // ----------------------------------------------------
+                // 4. Selesaikan Proses & Update Info Bar
+                // ----------------------------------------------------
+                document.getElementById('summaryText').innerHTML = `Total Diperiksa: <b>${globalExcelData.length}</b> Obat | Cocok: <b class="text-green-600">${totalSama}</b> | Selisih/Beda: <b class="text-red-600">${totalBeda}</b>`;
+                previewSection.classList.remove('hidden');
 
             } catch (error) {
-                // Tampilkan pesan error
-                statusMsg.textContent = "Error: " + error.message;
-                statusMsg.className = "text-sm font-semibold text-center mt-3 text-red-600 block";
+                statusMsg.textContent = "⚠ " + error.message;
+                statusMsg.className = "mt-4 p-3 text-sm font-semibold text-center text-red-700 bg-red-50 border border-red-200 rounded-lg block w-full md:w-2/3";
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = "Proses & Unduh Hasil";
+                btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Proses Ulang Data`;
             }
+        });
+
+        // Event eksekusi Unduh ke File Excel
+        document.getElementById('btnDownload').addEventListener('click', function() {
+            if(globalExcelData.length === 0) return;
+            const ws = XLSX.utils.json_to_sheet(globalExcelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Audit Fisik");
+            XLSX.writeFile(wb, "Hasil_Audit_DESK_STOK_OPNAME.xlsx");
         });
     </script>
 </body>
