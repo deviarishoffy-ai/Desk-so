@@ -3,60 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Perbandingan LPLPO & LPLPO RI</title>
-    <!-- Menggunakan Tailwind CSS untuk styling instan -->
+    <title>Aplikasi Audit LPLPO & Stok Opname</title>
+    <!-- Tailwind CSS untuk tampilan antarmuka -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS untuk membaca dan memproses Excel murni lewat browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
 
     <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-100">
         
         <div class="text-center mb-6">
-            <h2 class="text-2xl font-extrabold text-gray-800">Audit LPLPO</h2>
-            <p class="text-sm text-gray-500 mt-2">Bandingkan kolom selisih fisik LPLPO dan LPLPO RI secara otomatis.</p>
+            <h2 class="text-2xl font-extrabold text-gray-800">Audit Selisih SO</h2>
+            <p class="text-sm text-gray-500 mt-2">Bandingkan selisih LPLPO dengan hitungan (Fisik - LPLPO) dari file Stok Opname.</p>
         </div>
 
-        <!-- Pastikan action mengarah ke endpoint '/proses' pada file Python Anda -->
-        <form action="/proses" method="post" enctype="multipart/form-data" class="space-y-5">
+        <form id="auditForm" class="space-y-4">
             
-            <div class="space-y-2">
-                <label for="file_excel" class="block text-sm font-semibold text-gray-700">
-                    Unggah File Excel
-                </label>
-                <input 
-                    type="file" 
-                    id="file_excel" 
-                    name="file_excel" 
-                    accept=".xlsx" 
-                    required
-                    class="block w-full text-sm text-gray-600
-                           file:mr-4 file:py-2 file:px-4
-                           file:rounded-lg file:border-0
-                           file:text-sm file:font-semibold
-                           file:bg-blue-50 file:text-blue-700
-                           hover:file:bg-blue-100 
-                           border border-gray-200 rounded-lg p-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+            <!-- Upload File 1 -->
+            <div class="space-y-1">
+                <label class="block text-sm font-semibold text-gray-700">1. File LPLPO</label>
+                <p class="text-xs text-gray-400">Sheet: LPLPO (Mengambil selisih kolom terakhir)</p>
+                <input type="file" id="file_lplpo" accept=".xlsx" required
+                    class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-200 rounded-lg p-1.5 cursor-pointer">
             </div>
 
-            <button 
-                type="submit"
-                class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition duration-200 flex justify-center items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
+            <!-- Upload File 2 -->
+            <div class="space-y-1 mt-4">
+                <label class="block text-sm font-semibold text-gray-700">2. File Stok Opname</label>
+                <p class="text-xs text-gray-400">Sheet: worksheet (Menghitung Fisik - LPLPO)</p>
+                <input type="file" id="file_so" accept=".xlsx" required
+                    class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-gray-200 rounded-lg p-1.5 cursor-pointer">
+            </div>
+
+            <button type="submit" id="btnSubmit"
+                class="w-full mt-6 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition duration-200 flex justify-center items-center">
                 Proses & Unduh Hasil
             </button>
 
+            <!-- Pesan Status -->
+            <p id="statusMsg" class="text-sm font-semibold text-center mt-3 hidden"></p>
         </form>
-
-        <div class="mt-6 border-t border-gray-100 pt-4">
-            <p class="text-xs text-gray-400 text-center">
-                * Pastikan file menggunakan format ekstensi <b>.xlsx</b> dan memiliki sheet "LPLPO" serta "LPLPO RI".
-            </p>
-        </div>
-
     </div>
 
+    <script>
+        document.getElementById('auditForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btnSubmit');
+            const statusMsg = document.getElementById('statusMsg');
+            const fileLplpo = document.getElementById('file_lplpo').files[0];
+            const fileSo = document.getElementById('file_so').files[0];
+
+            btn.disabled = true;
+            btn.innerHTML = "Memproses...";
+            statusMsg.classList.add('hidden');
+
+            try {
+                // Fungsi pembantu untuk membaca file sebagai ArrayBuffer
+                const readFile = (file) => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(new Uint8Array(e.target.result));
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsArrayBuffer(file);
+                });
+
+                // 1. Baca kedua file
+                const data1 = await readFile(fileLplpo);
+                const data2 = await readFile(fileSo);
+                const wb1 = XLSX.read(data1, {type: 'array'});
+                const wb2 = XLSX.read(data2, {type: 'array'});
+
+                // 2. Akses Sheet LPLPO (File 1)
+                const sheet1 = wb1.Sheets['LPLPO'];
+                if(!sheet1) throw new Error("Sheet 'LPLPO' tidak ditemukan di file pertama.");
+                const rows1 = XLSX.utils.sheet_to_json(sheet1, {header: 1, defval: null});
+
+                // 3. Akses Sheet Worksheet (File 2)
+                const sheet2Name = wb2.SheetNames.find(s => s.toLowerCase() === 'worksheet');
+                if(!sheet2Name) throw new Error("Sheet 'worksheet' tidak ditemukan di file kedua.");
+                const sheet2 = wb2.Sheets[sheet2Name];
+                const rows2 = XLSX.utils.sheet_to_json(sheet2, {header: 1, defval: null});
+
+                // 4. Ekstrak Data File 1 (Dimulai baris ke-14 / index 13)
+                // Kolom: 1(Kode), 2(Nama), 32(Selisih Terakhir)
+                let lplpoMap = {};
+                for(let i = 13; i < rows1.length; i++) {
+                    const row = rows1[i];
+                    if(!row || !row[1]) continue; 
+                    const kode = row[1];
+                    const nama = row[2];
+                    const selisih = parseFloat(row[32]) || 0;
+                    lplpoMap[kode] = { nama, selisih };
+                }
+
+                // 5. Ekstrak Data File 2 (Dimulai baris ke-5 / index 4) dan Gabungkan
+                // Kolom: 2(Kode), 9(Fisik), 13(LPLPO)
+                let resultData = [];
+                for(let i = 4; i < rows2.length; i++) {
+                    const row = rows2[i];
+                    if(!row || !row[2]) continue; 
+                    const kode = row[2];
+                    
+                    if(lplpoMap[kode]) {
+                        const fisik = parseFloat(row[9]) || 0;
+                        const lplpo_so = parseFloat(row[13]) || 0;
+                        const hitung = fisik - lplpo_so;
+                        
+                        // Perbandingan
+                        const status = (lplpoMap[kode].selisih === hitung) ? 'SAMA' : 'BEDA';
+
+                        resultData.push({
+                            'Kode Obat': kode,
+                            'Nama Obat': lplpoMap[kode].nama,
+                            'Selisih (File LPLPO)': lplpoMap[kode].selisih,
+                            'Fisik (Worksheet)': fisik,
+                            'LPLPO (Worksheet)': lplpo_so,
+                            'Hasil Hitung (Fisik - LPLPO)': hitung,
+                            'Status Perbandingan': status
+                        });
+                    }
+                }
+
+                if(resultData.length === 0) throw new Error("Kode obat tidak ada yang cocok untuk disandingkan.");
+
+                // 6. Ekspor Hasil ke Excel
+                const ws = XLSX.utils.json_to_sheet(resultData);
+                const wbResult = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wbResult, ws, "Hasil Audit");
+                XLSX.writeFile(wbResult, "Hasil_Audit_Selisih.xlsx");
+
+                // Tampilkan pesan sukses
+                statusMsg.textContent = "Berhasil! File Excel telah diunduh.";
+                statusMsg.className = "text-sm font-semibold text-center mt-3 text-green-600 block";
+
+            } catch (error) {
+                // Tampilkan pesan error
+                statusMsg.textContent = "Error: " + error.message;
+                statusMsg.className = "text-sm font-semibold text-center mt-3 text-red-600 block";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Proses & Unduh Hasil";
+            }
+        });
+    </script>
 </body>
 </html>
